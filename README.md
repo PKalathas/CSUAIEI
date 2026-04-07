@@ -1,1 +1,1 @@
-CSU AI Educational Innovations repository 
+CSU AI Educational Innovations repository
