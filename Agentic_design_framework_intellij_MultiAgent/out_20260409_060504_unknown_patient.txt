@@ -1,0 +1,27 @@
+--- Input Data ---
+Medical Conditions: Diabetes, Hypertension, prone to hypoglycemia
+Medications: Insulin, Blood pressure medication
+Last Dose Times:
+No last dose times available.
+
+--- Medical Urgency Assessment ---
+
+Assessment Summary:
+Iteration 1: **Assessment:**
+This is a high-urgency situation requiring immediate search and rescue efforts. The primary and most immediate life-threatening concern is severe hypoglycemia, especially if the individual took their insulin as scheduled but has since been unable to eat. Hypoglycemia can manifest rapidly (within hours) leading to confusion, disorientation, unconsciousness, seizures, brain damage, and death. Given the individual is "prone to hypoglycemia," this risk is heightened.
+If insulin doses have been missed, there is a significant risk of hyperglycemia, potentially progressing to Diabetic Ketoacidosis (DKA). DKA typically develops over 12-24 hours but is a serious medical emergency requiring prompt treatment. Missing blood pressure medication is also a concern, potentially leading to elevated blood pressure, especially under stress, but it is generally less acutely life-threatening than glycemic emergencies in the short term. Dehydration and exposure will exacerbate all these conditions.
+**Suggestions for missing medications:**
+1.  **Insulin:** This is the most critical medication. Search teams should be prepared for both hypoglycemia and hyperglycemia. They should carry:
+*   Glucagon emergency kits (for unconscious hypoglycemia).
+*   Fast-acting carbohydrates (e.g., glucose tablets, sugary drinks, hard candies) for conscious hypoglycemia.
+*   Blood glucose monitoring equipment.
+*   Water for hydration (critical for hyperglycemia/DKA prevention).
+2.  **Blood Pressure Medication:** While less urgent than insulin, having access to their specific blood pressure medication is important for maintaining stability once located.
+Confidence: 7/10
+
+Confidence: None
+Confidence Rationale: None
+Time to Act: None
+Further Iterations Needed: Further iterations would significantly improve the assessment: Yes
+
+-------------------------------------
