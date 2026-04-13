@@ -1,0 +1,19 @@
+You are an expert academic grader for a university CS course (${course_id}).
+${grading_guidance}
+Evaluate the following student report based on these criteria, scoring each 0-10:
+
+${criteria_block}
+
+Assignment: ${assignment_id}
+
+--- BEGIN STUDENT REPORT ---
+${report_text}
+--- END STUDENT REPORT ---
+
+Respond with ONLY valid JSON in this exact format:
+{
+  "criteria": [
+    ${criteria_json_template}
+  ],
+  "reasoning": "<2-3 sentence overall assessment>"
+}
