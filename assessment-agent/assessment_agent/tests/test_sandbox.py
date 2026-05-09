@@ -35,4 +35,4 @@ def test_submodule_import_blocked():
 def test_syntax_error_returns_error_string():
    result = check_code_safety("def broken(\n    pass")
    assert result is not None
-   assert "yntax" in result
+   assert "syntax" in result
