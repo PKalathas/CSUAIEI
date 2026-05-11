@@ -2,10 +2,10 @@ import ast
 import json
 import logging
 
-from assessment_agent.models import AnomalyReport, AnomalyFlag
+from assessment_agent.models import AnomalyReport, AnomalyFlag, LLMCallRecord, ProvenanceCollector
 from assessment_agent.llm import LLMProvider
 from assessment_agent.rubric import AssignmentRubric
-from assessment_agent.prompt_loader import load_prompt
+from assessment_agent.prompt_loader import load_prompt_with_hash
 from assessment_agent import config
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,7 @@ async def detect_anomalies(
     student_id: str = "",
     rubric: AssignmentRubric | None = None,
     provider: LLMProvider | None = None,
+    collector: ProvenanceCollector | None = None,
 ) -> AnomalyReport:
     """Analyze code for style anomalies and potential academic integrity issues."""
     if rubric is None:
@@ -75,7 +76,7 @@ async def detect_anomalies(
 
     metrics = extract_style_metrics(code)
 
-    prompt = load_prompt(
+    prompt, prompt_hash = load_prompt_with_hash(
         "anomaly_detection",
         assignment_id=rubric.assignment_id,
         course_id=config.COURSE_ID,
@@ -85,9 +86,29 @@ async def detect_anomalies(
     )
 
     try:
-        result = await provider.complete_json(prompt)
+        result, raw, latency_ms = await provider.complete_with_raw(prompt)
+        if collector is not None:
+            collector.add_call(LLMCallRecord(
+                stage="anomaly_detection",
+                model_id=provider.model_id,
+                prompt_hash=prompt_hash,
+                prompt_text=prompt,
+                raw_response=raw,
+                latency_ms=latency_ms,
+            ))
     except Exception:
         logger.warning("Anomaly detection failed", exc_info=True)
+        if collector is not None:
+            collector.add_call(LLMCallRecord(
+                stage="anomaly_detection",
+                model_id=getattr(provider, "model_id", "unknown"),
+                prompt_hash=prompt_hash,
+                prompt_text=prompt,
+                raw_response="",
+                latency_ms=0,
+                success=False,
+                error="Anomaly detection failed",
+            ))
         return AnomalyReport(recommendation="Failed to analyze submission.")
 
     flags = []

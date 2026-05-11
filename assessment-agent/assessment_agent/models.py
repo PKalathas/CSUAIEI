@@ -77,6 +77,60 @@ class FeedbackReport(BaseModel):
     detailed_feedback: str = ""  # Full markdown feedback
 
 
+class LLMCallRecord(BaseModel):
+    stage: str
+    model_id: str
+    prompt_hash: str
+    prompt_text: str
+    raw_response: str
+    latency_ms: int
+    success: bool = True
+    error: str = ""
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class ProvenanceRecord(BaseModel):
+    code_hash: Optional[str] = None
+    report_hash: Optional[str] = None
+    rubric_hash: str = ""
+    model_id: str = ""
+    prompt_versions: dict[str, str] = Field(default_factory=dict)
+    llm_calls: list[LLMCallRecord] = Field(default_factory=list)
+    total_latency_ms: int = 0
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class ProvenanceCollector:
+    """Runtime accumulator passed through the pipeline to collect LLM call records."""
+
+    def __init__(
+        self,
+        model_id: str,
+        rubric_hash: str,
+        code_hash: Optional[str] = None,
+        report_hash: Optional[str] = None,
+    ) -> None:
+        self.model_id = model_id
+        self.rubric_hash = rubric_hash
+        self.code_hash = code_hash
+        self.report_hash = report_hash
+        self._calls: list[LLMCallRecord] = []
+
+    def add_call(self, record: LLMCallRecord) -> None:
+        self._calls.append(record)
+
+    def build(self) -> ProvenanceRecord:
+        return ProvenanceRecord(
+            code_hash=self.code_hash,
+            report_hash=self.report_hash,
+            rubric_hash=self.rubric_hash,
+            model_id=self.model_id,
+            prompt_versions={c.stage: c.prompt_hash for c in self._calls if c.success},
+            llm_calls=self._calls,
+            total_latency_ms=sum(c.latency_ms for c in self._calls),
+        )
+
+
 class ManualReviewRequest(BaseModel):
     submission_id: str
     student_id: str
@@ -105,6 +159,7 @@ class AssessmentResult(BaseModel):
     status: str = "completed"
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     agent_reasoning: str = ""  # The orchestrator's chain-of-thought
+    provenance: Optional[ProvenanceRecord] = None
 
 
 class AssessmentRequest(BaseModel):

@@ -160,6 +160,19 @@ async def complete_manual_review(
     return {"status": "completed", "submission_id": submission_id}
 
 
+@router.get("/results/{submission_id}/provenance")
+async def get_provenance(submission_id: str):
+    """Get the provenance record for a submission — prompts, model, hashes, raw LLM responses."""
+    results = _get_results()
+    for r in results:
+        if r["submission_id"] == submission_id:
+            provenance = r.get("provenance")
+            if provenance is None:
+                raise HTTPException(404, f"No provenance record for submission '{submission_id}'")
+            return provenance
+    raise HTTPException(404, f"Submission '{submission_id}' not found")
+
+
 @router.get("/anomalies")
 async def list_anomalies(reviewed: bool = None):
     """Get flagged anomaly reports."""
