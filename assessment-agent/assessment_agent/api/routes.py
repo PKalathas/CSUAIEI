@@ -1,5 +1,3 @@
-import json
-import os
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from typing import Optional
 
@@ -8,7 +6,7 @@ from assessment_agent.agents.orchestrator import assess_submission
 from assessment_agent.agents.code_grader import get_available_assignments, load_test_cases
 from assessment_agent.interfaces.instructor_copilot import get_review_queue, complete_review
 from assessment_agent.interfaces.integrity_guardian import get_anomaly_reports
-from assessment_agent import config
+from assessment_agent import config, persistence
 from assessment_agent.config import RESULTS_FILE
 
 router = APIRouter(tags=["assessment"])
@@ -16,22 +14,32 @@ router = APIRouter(tags=["assessment"])
 
 def _save_result(result: AssessmentResult) -> None:
     """Persist assessment result to JSON file."""
-    results = []
-    if os.path.exists(RESULTS_FILE):
-        with open(RESULTS_FILE) as f:
-            results = json.load(f)
-
-    results.append(result.model_dump())
-
-    with open(RESULTS_FILE, "w") as f:
-        json.dump(results, f, indent=2)
+    persistence.append_json(RESULTS_FILE, result.model_dump())
 
 
 def _get_results() -> list[dict]:
-    if not os.path.exists(RESULTS_FILE):
-        return []
-    with open(RESULTS_FILE) as f:
-        return json.load(f)
+    return persistence.read_json(RESULTS_FILE)
+
+
+async def _read_text_upload(
+    upload: UploadFile,
+    *,
+    enforce_size: bool,
+    field_name: str,
+) -> str:
+    """Read an UploadFile as UTF-8 text. Raise HTTP 400 on bad bytes or oversize."""
+    content = await upload.read()
+    if enforce_size:
+        max_bytes = config.MAX_SUBMISSION_SIZE_MB * 1024 * 1024
+        if len(content) > max_bytes:
+            raise HTTPException(
+                400,
+                f"{field_name} exceeds {config.MAX_SUBMISSION_SIZE_MB} MB limit",
+            )
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(400, f"{field_name} is not valid UTF-8")
 
 
 @router.post("/submit", response_model=AssessmentResult)
@@ -47,17 +55,11 @@ async def submit_assessment(
 
     code = None
     if code_file:
-        code = (await code_file.read()).decode("utf-8")
+        code = await _read_text_upload(code_file, enforce_size=True, field_name="code_file")
 
     report = None
     if report_file:
-        content = await report_file.read()
-        filename = report_file.filename or ""
-        if filename.endswith(".md") or filename.endswith(".txt"):
-            report = content.decode("utf-8")
-        else:
-            # For other formats, try UTF-8 decode
-            report = content.decode("utf-8", errors="replace")
+        report = await _read_text_upload(report_file, enforce_size=False, field_name="report_file")
 
     request = AssessmentRequest(
         student_id=student_id,
@@ -148,14 +150,13 @@ async def complete_manual_review(
 
     # Update the final score in results
     results = _get_results()
-    for r in results:
-        if r["submission_id"] == submission_id:
-            manual_weighted = instructor_score * config.MANUAL_REVIEW_WEIGHT * 100
-            r["final_score"] = round(r["automated_score"] + manual_weighted, 2)
-            break
-
-    with open(RESULTS_FILE, "w") as f:
-        json.dump(results, f, indent=2)
+    target = next((r for r in results if r["submission_id"] == submission_id), None)
+    if target is not None:
+        manual_weighted = (instructor_score / 10) * 100 * config.MANUAL_REVIEW_WEIGHT
+        new_final_score = round(target["automated_score"] + manual_weighted, 2)
+        persistence.update_json(
+            RESULTS_FILE, "submission_id", submission_id, {"final_score": new_final_score}
+        )
 
     return {"status": "completed", "submission_id": submission_id}
 
