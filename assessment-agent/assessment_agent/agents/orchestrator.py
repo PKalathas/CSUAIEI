@@ -51,7 +51,7 @@ async def assess_submission(request: AssessmentRequest) -> AssessmentResult:
     # Step 1: Code Grading (60%)
     code_grade = None
     if request.code and sub_type in (SubmissionType.CODE_ONLY, SubmissionType.FULL):
-        code_grade = grade_code(request.code, request.assignment_id, rubric=rubric)
+        code_grade = await grade_code(request.code, request.assignment_id, rubric=rubric, provider=provider)
         result.code_grade = code_grade
 
     # Step 2: Report Evaluation (30%)

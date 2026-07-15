@@ -40,6 +40,7 @@ class CodeGradeResult(BaseModel):
     weighted_score: float = 0.0  # raw_score * 0.60
     compilation_error: str = ""
     runtime_errors: list[str] = []
+    llm_reasoning: str = ""
 
 
 class ReportCriterion(BaseModel):

@@ -1,11 +1,15 @@
 import json
+import logging
 import os
 
 from assessment_agent.models import TestCase, TestCaseResult, CodeGradeResult
 from assessment_agent.sandbox.runner import run_code
 from assessment_agent.rubric import AssignmentRubric
+from assessment_agent.prompt_loader import load_prompt
+from assessment_agent.llm import LLMProvider
 from assessment_agent import config
 
+logger = logging.getLogger(__name__)
 
 # Paths for both old and new assignment directory layouts
 _PACKAGE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -88,12 +92,36 @@ def get_available_assignments() -> list[dict]:
     return assignments
 
 
-def grade_code(
+def _build_test_results_block(
+    test_cases: list[TestCase],
+    executions: list,  # list of ExecutionResult
+) -> str:
+    """Format test case executions into a human-readable block for the LLM."""
+    lines = []
+    for tc, ex in zip(test_cases, executions):
+        status = "TIMED OUT" if ex.timed_out else ("ERROR" if ex.exit_code != 0 else "RAN OK")
+        lines.append(
+            f"Test: {tc.name} ({tc.points} pts)\n"
+            f"  Input:    {tc.input!r}\n"
+            f"  Expected: {tc.expected_output!r}\n"
+            f"  Actual:   {ex.stdout!r}\n"
+            f"  Status:   {status}"
+            + (f"\n  Error:    {ex.stderr[:200]}" if ex.stderr else "")
+        )
+    return "\n\n".join(lines)
+
+
+async def grade_code(
     code: str,
     assignment_id: str,
     rubric: AssignmentRubric | None = None,
+    provider: LLMProvider | None = None,
 ) -> CodeGradeResult:
-    """Run student code against test cases and produce a grade."""
+    """Run student code against test cases, then use an LLM to award partial credit."""
+    if provider is None:
+        from assessment_agent.llm import get_llm_provider
+        provider = get_llm_provider()
+
     test_cases = load_test_cases(assignment_id)
 
     if not test_cases:
@@ -101,29 +129,66 @@ def grade_code(
             compilation_error=f"No test cases found for assignment '{assignment_id}'"
         )
 
-    results = []
-    total_points = 0
-    earned_points = 0
-
+    # --- Step 1: Execute all test cases in the sandbox ---
+    executions = []
     for tc in test_cases:
+        executions.append(run_code(code, stdin_input=tc.input, timeout=tc.timeout_seconds))
+
+    # --- Step 2: Ask the LLM to evaluate each result and award partial credit ---
+    test_results_block = _build_test_results_block(test_cases, executions)
+
+    prompt = load_prompt(
+        "code_grading",
+        assignment_id=assignment_id,
+        course_id=config.COURSE_ID,
+        grading_guidance=(rubric.guidance or "") if rubric else "",
+        code=code[:config.MAX_CODE_CHARS],
+        num_tests=len(test_cases),
+        test_results_block=test_results_block,
+    )
+
+    try:
+        llm_result = await provider.complete_json(prompt)
+    except Exception:
+        logger.warning("LLM code grading failed, falling back to exact-match", exc_info=True)
+        llm_result = {}
+
+    # Build a lookup: test_name -> credit_fraction from LLM response
+    credit_map: dict[str, float] = {}
+    for ev in llm_result.get("test_evaluations", []):
+        name = ev.get("name", "")
+        fraction = float(ev.get("credit_fraction", 0.0))
+        credit_map[name] = max(0.0, min(1.0, fraction))
+
+    # --- Step 3: Combine execution results with LLM credit fractions ---
+    results = []
+    total_points = 0.0
+    earned_points = 0.0
+
+    for tc, ex in zip(test_cases, executions):
         total_points += tc.points
-        execution = run_code(code, stdin_input=tc.input, timeout=tc.timeout_seconds)
 
-        passed = (
-            execution.exit_code == 0
-            and execution.stdout.strip() == tc.expected_output.strip()
-        )
+        if credit_map:
+            # LLM grading path: use the LLM-assigned credit fraction
+            fraction = credit_map.get(tc.name, 0.0)
+        else:
+            # Fallback: exact string match (original behaviour)
+            exact_match = (
+                ex.exit_code == 0
+                and ex.stdout.strip() == tc.expected_output.strip()
+            )
+            fraction = 1.0 if exact_match else 0.0
 
-        points = tc.points if passed else 0.0
+        points = round(tc.points * fraction, 2)
         earned_points += points
 
         results.append(TestCaseResult(
             name=tc.name,
-            passed=passed,
+            passed=fraction >= 1.0,
             expected_output=tc.expected_output,
-            actual_output=execution.stdout,
-            error=execution.stderr if not passed else "",
-            execution_time_ms=execution.execution_time_ms,
+            actual_output=ex.stdout,
+            error=ex.stderr if fraction < 1.0 else "",
+            execution_time_ms=ex.execution_time_ms,
             points_earned=points,
             points_possible=tc.points,
         ))
@@ -131,13 +196,12 @@ def grade_code(
     raw_score = (earned_points / total_points * 100) if total_points > 0 else 0
     tests_passed = sum(1 for r in results if r.passed)
 
-    code_weight = config.CODE_GRADE_WEIGHT
-
     return CodeGradeResult(
         test_results=results,
         tests_passed=tests_passed,
         tests_total=len(results),
         raw_score=round(raw_score, 2),
-        weighted_score=round(raw_score * code_weight, 2),
+        weighted_score=round(raw_score * config.CODE_GRADE_WEIGHT, 2),
         runtime_errors=[r.error for r in results if r.error],
+        llm_reasoning=llm_result.get("overall_reasoning", ""),
     )

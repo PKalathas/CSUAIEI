@@ -71,12 +71,12 @@ def read_file(name):
 
 
 # ─────────────────────────────────────────────
-# Demo 1: Code-only grading (fast, no LLM)
+# Demo 1: Code-only grading (LLM-based)
 # ─────────────────────────────────────────────
 
-def demo_code_grading():
-    header("DEMO 1: Code Grading (Offline — No LLM)")
-    print("This runs purely locally: sandbox execution + string comparison.\n")
+async def demo_code_grading():
+    header("DEMO 1: Code Grading (LLM-based partial credit)")
+    print("Runs code in sandbox, then asks Claude to award partial credit per test.\n")
 
     submissions = [
         ("Alice (perfect)", "student_a_perfect.py"),
@@ -88,7 +88,7 @@ def demo_code_grading():
     for name, filename in submissions:
         code = read_file(filename)
         start = time.time()
-        grade = grade_code(code, "hw1_sorting")
+        grade = await grade_code(code, "hw1_sorting")
         elapsed = time.time() - start
 
         section(f"{name}: {filename}")
@@ -102,6 +102,9 @@ def demo_code_grading():
                 ok(f"{tr.name} ({tr.points_earned}/{tr.points_possible} pts)")
             else:
                 fail(f"{tr.name} — expected: '{tr.expected_output[:40]}', got: '{tr.actual_output[:40]}'")
+
+        if grade.llm_reasoning:
+            info(f"LLM: {grade.llm_reasoning[:120]}")
 
         if grade.runtime_errors:
             for err in grade.runtime_errors[:2]:
@@ -195,7 +198,7 @@ async def demo_full_assessment(student_name, code_file, report_file=None):
 
 async def demo_agentic_pipeline():
     header("DEMO 2: Full Agentic Assessment (Claude CLI)")
-    print("Each submission spawns 3 Claude calls: anomaly + reasoning + feedback\n")
+    print("Each submission spawns 4 Claude calls: code grading + anomaly + reasoning + feedback\n")
 
     results = []
 
@@ -273,8 +276,8 @@ async def main():
     print(f"{'║'} {'CSC 580 Lab Agentic Design Framework':^56} {'║'}")
     print(f"{'╚' + '═' * 58 + '╝'}{RESET}")
 
-    # Demo 1: Fast offline code grading
-    demo_code_grading()
+    # Demo 1: LLM-based code grading
+    await demo_code_grading()
 
     input(f"\n{DIM}Press Enter to run full agentic assessment (uses Claude CLI)...{RESET}")
 
