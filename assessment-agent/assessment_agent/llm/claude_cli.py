@@ -10,6 +10,7 @@ import asyncio
 import os
 import shutil
 import subprocess
+import time
 
 from .base import LLMProvider, extract_json
 
@@ -28,8 +29,10 @@ def _get_claude_path() -> str:
 class ClaudeCLIProvider:
     """LLM provider that shells out to the ``claude`` CLI."""
 
-    def __init__(self, timeout: int = 180) -> None:
+    def __init__(self, timeout: int = 180, model_id: str = "claude-cli") -> None:
         self.timeout = timeout
+        # model_id reflects the CLI's underlying model; update when the CLI default changes.
+        self.model_id = model_id
 
     # -- internal --------------------------------------------------------
 
@@ -71,7 +74,14 @@ class ClaudeCLIProvider:
             prompt = f"{system}\n\n{prompt}"
         return await asyncio.to_thread(self._invoke, prompt)
 
+    async def complete_with_raw(self, prompt: str, system: str = "") -> tuple[dict, str, int]:
+        """Send *prompt* to the Claude CLI, return (parsed_json, raw_response, latency_ms)."""
+        start = time.monotonic()
+        raw = await self.complete(prompt, system)
+        latency_ms = int((time.monotonic() - start) * 1000)
+        return extract_json(raw), raw, latency_ms
+
     async def complete_json(self, prompt: str, system: str = "") -> dict:
         """Send *prompt* to the Claude CLI, parse the response as JSON."""
-        response = await self.complete(prompt, system)
-        return extract_json(response)
+        parsed, _, _ = await self.complete_with_raw(prompt, system)
+        return parsed
