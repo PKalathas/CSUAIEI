@@ -1,0 +1,51 @@
+location: West US
+name: integrity-guardian-app
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      allowInsecure: false
+      external: false           # Internal only — not publicly exposed
+      targetPort: 8000
+      transport: Auto
+    secrets:
+    - name: cosmos-key
+      value: <COSMOS_KEY>
+    - name: aoai-key
+      value: <AZURE_OPENAI_API_KEY>
+    - name: internal-token
+      value: <INTERNAL_API_TOKEN>
+    registries:
+    - server: x80registry.azurecr.io
+      username: x80registry
+      passwordSecretRef: acr-password
+  environmentId: /subscriptions/9c980c79-9c72-4ca7-b5ba-368e3e5a12b1/resourceGroups/x80_assistant_group/providers/Microsoft.App/managedEnvironments/x80-environment
+  template:
+    containers:
+    - image: x80registry.azurecr.io/integrity-guardian:v1
+      name: integrity-guardian-app
+      env:
+      - name: AZURE_OPENAI_ENDPOINT
+        value: https://aieic-participant-openai.openai.azure.com/
+      - name: AZURE_OPENAI_DEPLOYMENT_NAME
+        value: gpt-4o
+      - name: AZURE_OPENAI_API_VERSION
+        value: "2024-02-01"
+      - name: AZURE_OPENAI_API_KEY
+        secretRef: aoai-key
+      - name: COSMOS_URL
+        value: https://aieic-cosmos-ytan2026.documents.azure.com:443/
+      - name: COSMOS_KEY
+        secretRef: cosmos-key
+      - name: COSMOS_DATABASE
+        value: integrity_guardian
+      - name: INTERNAL_API_TOKEN
+        secretRef: internal-token
+      - name: LOG_LEVEL
+        value: INFO
+      resources:
+        cpu: 0.5
+        memory: 1Gi
+    scale:
+      maxReplicas: 5
+      minReplicas: 1    # Keep warm — Lab Companion calls synchronously
