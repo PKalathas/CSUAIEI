@@ -1,0 +1,91 @@
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="700" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ======= NODES ======= -->
+
+    <!-- Student -->
+    <mxCell id="student" value="&lt;b&gt;Student&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontColor=#23445d;arcSize=12;" vertex="1" parent="1">
+      <mxGeometry x="60" y="290" width="110" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- Lab Companion -->
+    <mxCell id="lab" value="&lt;b&gt;Lab Companion&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;Chainlit · FastAPI&lt;br&gt;Port 8000&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontColor=#1e4d2b;arcSize=12;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="270" y="265" width="180" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- Participant Agent -->
+    <mxCell id="pa" value="&lt;b&gt;Participant Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;FastAPI · Port 8001&lt;br&gt;Azure App Service&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontColor=#5a3e00;arcSize=12;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="710" y="265" width="195" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- Azure OpenAI -->
+    <mxCell id="openai" value="&lt;b&gt;Azure OpenAI&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;GPT-4&lt;br&gt;classify_question()&lt;br&gt;_generate_summary()&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontColor=#1e4d2b;arcSize=12;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1080" y="100" width="200" height="95" as="geometry" />
+    </mxCell>
+
+    <!-- Azure Cosmos DB (cylinder) -->
+    <mxCell id="cosmos" value="&lt;b&gt;Azure Cosmos DB&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;DB: aieic-lab&lt;br&gt;Container: interactions&lt;br&gt;PartitionKey: /student_id&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#007a99;strokeColor=#005885;fontColor=#ffffff;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1080" y="380" width="200" height="120" as="geometry" />
+    </mxCell>
+
+    <!-- ======= EDGES ======= -->
+
+    <!-- Student → Lab Companion: asks question -->
+    <mxCell id="e_ask" value="asks question" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#23445d;strokeWidth=2;fontSize=11;fontColor=#23445d;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="student" target="lab">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Lab Companion → Participant Agent: POST /participant/log -->
+    <mxCell id="e_post" value="&lt;b&gt;POST /participant/log&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ae3e3e;strokeWidth=2.5;fontSize=11;fontColor=#ae3e3e;fontStyle=1;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" edge="1" parent="1" source="lab" target="pa">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Lab Companion → Participant Agent: GET /participant/context -->
+    <mxCell id="e_get" value="&lt;b&gt;GET /participant/context&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#7030a0;strokeWidth=2.5;fontSize=11;fontColor=#7030a0;fontStyle=1;exitX=1;exitY=0.65;exitDx=0;exitDy=0;entryX=0;entryY=0.65;entryDx=0;entryDy=0;" edge="1" parent="1" source="lab" target="pa">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Participant Agent → Azure OpenAI: classify_question -->
+    <mxCell id="e_classify" value="classify_question(message)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=1.5;fontSize=10;fontColor=#1e4d2b;dashed=1;dashStyle=8 4;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="pa" target="openai">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Azure OpenAI → Participant Agent: classification result -->
+    <mxCell id="e_classify_ret" value="{question_type, hint_level, difficulty}" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=1.5;fontSize=10;fontColor=#1e4d2b;dashed=1;dashStyle=8 4;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=1;entryY=0.2;entryDx=0;entryDy=0;" edge="1" parent="1" source="openai" target="pa">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Participant Agent → Cosmos DB: upsert document -->
+    <mxCell id="e_upsert" value="upsert document" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#23445d;strokeWidth=2;fontSize=10;fontColor=#23445d;exitX=1;exitY=0.6;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="pa" target="cosmos">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Participant Agent → Cosmos DB: query by student_id -->
+    <mxCell id="e_query" value="query by student_id" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#7030a0;strokeWidth=1.5;fontSize=10;fontColor=#7030a0;dashed=1;dashStyle=8 4;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pa" target="cosmos">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Participant Agent → Azure OpenAI: generate_summary (context flow) -->
+    <mxCell id="e_summary" value="_generate_summary(stats)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=1.5;fontSize=10;fontColor=#1e4d2b;dashed=1;dashStyle=8 4;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=0.3;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="cosmos" target="openai">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Participant Agent → Lab Companion: return context (dashed purple) -->
+    <mxCell id="e_ctx_ret" value="return context  {total_questions, type_dist, avg_hint, summary}" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#7030a0;strokeWidth=1.5;fontSize=10;fontColor=#7030a0;dashed=1;dashStyle=8 4;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=1;entryY=0.8;entryDx=0;entryDy=0;" edge="1" parent="1" source="pa" target="lab">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="660" y="345" />
+          <mxPoint x="510" y="345" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Lab Companion → Student: personalized response (dashed blue) -->
+    <mxCell id="e_resp" value="personalized response" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontColor=#23445d;dashed=1;dashStyle=8 4;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=1;entryY=0.8;entryDx=0;entryDy=0;" edge="1" parent="1" source="lab" target="student">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>
