@@ -1,0 +1,39 @@
+location: West US
+name: x80-assistant-app
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      allowInsecure: false
+      external: true
+      targetPort: 8000
+      traffic:
+      - latestRevision: true
+        weight: 100
+      transport: Auto
+    secrets:
+    - name: acr-password
+      value: Fl2ULRpwqv1vV/j5JYtIR36/N3tDOp9eONLFus+PO++ACRDcixaL
+    registries:
+    - server: x80registry.azurecr.io
+      username: x80registry
+      passwordSecretRef: acr-password
+  environmentId: /subscriptions/9c980c79-9c72-4ca7-b5ba-368e3e5a12b1/resourceGroups/x80_assistant_group/providers/Microsoft.App/managedEnvironments/x80-environment
+  template:
+    containers:
+    - image: x80registry.azurecr.io/chainlit-app:v1
+      name: x80-assistant-app
+      resources:
+        cpu: 1
+        ephemeralStorage: 2Gi
+        memory: 2Gi
+      volumeMounts:
+      - volumeName: appdatavolume
+        mountPath: /appdata
+    scale:
+      maxReplicas: 10
+      minReplicas: 0
+    volumes:
+    - name: appdatavolume
+      storageName: appdata-storage
+      storageType: AzureFile

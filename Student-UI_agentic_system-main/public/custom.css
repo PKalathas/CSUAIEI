@@ -1,0 +1,41 @@
+/* Override the 2-column grid to single column centered */
+div.grid.min-h-svh {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Hide the right side container with the background image */
+div.relative.bg-muted.overflow-hidden,
+div.relative.hidden.bg-muted {
+    display: none !important;
+}
+
+/* Also target by the image inside */
+div:has(> img[src*="favicon"].absolute) {
+    display: none !important;
+}
+
+/* Make the form container centered */
+div.grid.min-h-svh > div.flex.flex-col.gap-4 {
+    width: 100% !important;
+    max-width: 500px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Center the logo */
+div.flex.justify-center.gap-2 {
+    justify-content: center !important;
+}
+
+/* Round the corners of logos and avatars */
+img.logo,
+img[alt="logo"],
+img[src*="avatar"],
+img[src*="Assistant"] {
+    border-radius: 12px !important;
+}

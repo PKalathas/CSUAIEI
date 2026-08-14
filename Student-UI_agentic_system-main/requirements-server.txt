@@ -1,0 +1,13 @@
+fastapi>=0.115.0,<1
+uvicorn[standard]>=0.34.0,<1
+openai>=2.14.0,<3
+anthropic>=0.40.0,<1
+pydantic>=2.0.0,<3
+azure-search-documents>=11.6.0,<12
+azure-storage-blob>=12.24.0,<13
+azure-core>=1.37.0,<2
+python-dotenv>=1.2.1,<2
+PyJWT>=2.8,<3
+httpx>=0.28.0,<1
+opentelemetry-sdk>=1.20.0
+opentelemetry-exporter-otlp-proto-grpc>=1.20.0

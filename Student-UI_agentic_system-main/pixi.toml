@@ -1,0 +1,54 @@
+[workspace]
+authors = ["Charles O'Hanlon"]
+channels = ["conda-forge"]
+name = "adfel_agentic_system"
+platforms = ["osx-64", "osx-arm64"]
+version = "0.3.0"
+
+# ----------------------------------------------------------------------
+# Tasks — client/server split.  The server hosts the LabHarness; the
+# Chainlit client is a thin HTTP/SSE proxy.
+#
+# Required env vars (put them in .env; python-dotenv loads it at startup):
+#   AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY,
+#   AZURE_OPENAI_DEPLOYMENT_NAME, AZURE_OPENAI_API_VERSION
+#   AZURE_SEARCH_* (optional — KB disabled if blank)
+#   ADFEL_SERVER_URL (client needs this; defaults to http://localhost:8080)
+#   Auth (Cal Poly CAS): CHAINLIT_AUTH_SECRET, SESSION_JWT_SECRET, CAS_BASE_URL,
+#     CAS_SERVICE_URL, ADFEL_ADMIN_EMAIL. Local dev: set CAS_MOCK=1 on both
+#     processes to run the flow without a live Cal Poly IdP. See .env.example.
+# ----------------------------------------------------------------------
+[tasks]
+dev-server = "uvicorn server.main:app --reload --port 8080"
+dev-client = "chainlit run app.py -w"
+start-server = "uvicorn server.main:app --host 0.0.0.0 --port 8080"
+start-client = "chainlit run app.py -h --host 0.0.0.0 --port 8000"
+reset-db = "rm -rf data/courses && rm -f data/participant.db data/guardian.db data/system.db data/*.db-journal data/*.db-wal data/*.db-shm"
+
+[activation.env]
+# Local SQLite stores live under ./data/ (mirrors the docker-compose mount).
+PARTICIPANT_DB_PATH = "$PIXI_PROJECT_ROOT/data/participant.db"
+GUARDIAN_DB_PATH    = "$PIXI_PROJECT_ROOT/data/guardian.db"
+PYTHONPATH          = "$PIXI_PROJECT_ROOT"
+
+[dependencies]
+python = "3.12.*"
+
+[pypi-dependencies]
+# Server
+fastapi                = ">=0.115.0, <1"
+uvicorn                = { version = ">=0.34.0, <1", extras = ["standard"] }
+openai                 = ">=1.40.0, <3"
+anthropic              = ">=0.40.0, <1"
+azure-search-documents = ">=11.6.0, <12"
+azure-storage-blob     = ">=12.24.0, <13"
+azure-core             = ">=1.37.0, <2"
+python-dotenv          = ">=1.0.0, <2"
+pydantic               = ">=2.0.0, <3"
+pyjwt                  = ">=2.8, <3"
+# Client
+chainlit               = ">=2.9.4, <3"
+httpx                  = { version = ">=0.28.0, <1", extras = ["http2"] }
+
+# Dev / notebooks
+ipykernel = "*"

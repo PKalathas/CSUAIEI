@@ -1,0 +1,51 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
+      AZURE_OPENAI_DEPLOYMENT_NAME: ${AZURE_OPENAI_DEPLOYMENT_NAME}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-12-01-preview}
+      AZURE_SEARCH_ENDPOINT: ${AZURE_SEARCH_ENDPOINT:-}
+      AZURE_SEARCH_API_KEY: ${AZURE_SEARCH_API_KEY:-}
+      AZURE_SEARCH_INDEX_NAME: ${AZURE_SEARCH_INDEX_NAME:-}
+      # Auth — Cal Poly CAS + server-minted session JWT. Set CAS_MOCK=1 to
+      # run the whole login flow locally without a live Cal Poly IdP.
+      CAS_BASE_URL: ${CAS_BASE_URL:-}
+      CAS_SERVICE_URL: ${CAS_SERVICE_URL:-}
+      CAS_EMAIL_DOMAIN: ${CAS_EMAIL_DOMAIN:-calpoly.edu}
+      SESSION_JWT_SECRET: ${SESSION_JWT_SECRET:-}
+      SESSION_JWT_TTL: ${SESSION_JWT_TTL:-28800}
+      CAS_MOCK: ${CAS_MOCK:-}
+      ADFEL_ADMIN_EMAIL: ${ADFEL_ADMIN_EMAIL:-}
+      ADFEL_DEV_AUTH_BYPASS: ${ADFEL_DEV_AUTH_BYPASS:-}
+      ADFEL_DEV_USER_ID: ${ADFEL_DEV_USER_ID:-}
+      STUDENT_ID: ${STUDENT_ID:-default-student}
+      LAB_ID: ${LAB_ID:-default-lab}
+      COURSE_ID: ${COURSE_ID:-CSC580}
+      PARTICIPANT_DB_PATH: /data/participant.db
+      GUARDIAN_DB_PATH: /data/guardian.db
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/data
+    ports:
+      - "8080:8080"
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ADFEL_SERVER_URL: http://server:8080
+      CHAINLIT_AUTH_SECRET: ${CHAINLIT_AUTH_SECRET:-changeme}
+      CAS_BASE_URL: ${CAS_BASE_URL:-}
+      CAS_SERVICE_URL: ${CAS_SERVICE_URL:-}
+      CAS_MOCK: ${CAS_MOCK:-}
+      ADFEL_COOKIE_SECURE: ${ADFEL_COOKIE_SECURE:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - server
