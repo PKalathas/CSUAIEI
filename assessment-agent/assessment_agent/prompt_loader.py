@@ -12,6 +12,7 @@ any variables not provided are left as-is (important during the
 incremental migration to external templates).
 """
 
+import hashlib
 from string import Template
 import os
 
@@ -76,3 +77,14 @@ def load_prompt(name: str, assignment_id: str | None = None, **kwargs) -> str:
         content = fh.read()
 
     return Template(content).safe_substitute(**kwargs)
+
+
+def load_prompt_with_hash(name: str, assignment_id: str | None = None, **kwargs) -> tuple[str, str]:
+    """Load and render a prompt template, returning (rendered_text, sha256_hex).
+
+    The hash covers the fully-rendered prompt (after variable substitution) so
+    it reflects the exact input sent to the LLM, not just the template on disk.
+    """
+    rendered = load_prompt(name, assignment_id, **kwargs)
+    prompt_hash = hashlib.sha256(rendered.encode("utf-8")).hexdigest()
+    return rendered, prompt_hash

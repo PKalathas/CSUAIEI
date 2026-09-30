@@ -7,6 +7,7 @@ criteria, point values, and grading guidance into Pydantic models.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -204,6 +205,35 @@ def default_rubric() -> AssignmentRubric:
 
 # Package directory – used to resolve assignment paths
 _PACKAGE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+
+
+_DEFAULT_RUBRIC_HASH = hashlib.sha256(b"assessment-agent:default-rubric:v1").hexdigest()
+
+
+def load_rubric_with_hash(assignment_id: str) -> tuple[AssignmentRubric, str]:
+    """Load a rubric and return (rubric, sha256_of_raw_markdown).
+
+    For the built-in default rubric (no file found), returns a stable sentinel
+    hash so provenance records are still comparable across runs.
+    """
+    rubric_path = _PACKAGE_DIR / "assignments" / assignment_id / "rubric.md"
+
+    if rubric_path.is_file():
+        logger.info("Loading rubric from %s", rubric_path)
+        text = rubric_path.read_text(encoding="utf-8")
+        rubric_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        rubric = parse_rubric_markdown(text)
+        rubric.assignment_id = assignment_id
+        return rubric, rubric_hash
+
+    logger.info(
+        "No rubric.md found for assignment %r at %s; using default rubric",
+        assignment_id,
+        rubric_path,
+    )
+    rubric = default_rubric()
+    rubric.assignment_id = assignment_id
+    return rubric, _DEFAULT_RUBRIC_HASH
 
 
 def load_rubric(assignment_id: str) -> AssignmentRubric:

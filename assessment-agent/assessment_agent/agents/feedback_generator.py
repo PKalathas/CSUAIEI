@@ -5,10 +5,12 @@ from assessment_agent.models import (
     CodeGradeResult,
     ReportEvaluation,
     AnomalyReport,
+    LLMCallRecord,
+    ProvenanceCollector,
 )
 from assessment_agent.llm import LLMProvider
 from assessment_agent.rubric import AssignmentRubric
-from assessment_agent.prompt_loader import load_prompt
+from assessment_agent.prompt_loader import load_prompt_with_hash
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,7 @@ async def generate_feedback(
     anomaly: AnomalyReport | None,
     rubric: AssignmentRubric | None = None,
     provider: LLMProvider | None = None,
+    collector: ProvenanceCollector | None = None,
 ) -> FeedbackReport:
     """Generate personalized feedback using an LLM based on all assessment components."""
     if rubric is None:
@@ -64,7 +67,7 @@ async def generate_feedback(
         from assessment_agent.llm import get_llm_provider
         provider = get_llm_provider()
 
-    prompt = load_prompt(
+    prompt, prompt_hash = load_prompt_with_hash(
         "feedback_generation",
         assignment_id=assignment_id,
         student_id=student_id,
@@ -76,9 +79,29 @@ async def generate_feedback(
     )
 
     try:
-        result = await provider.complete_json(prompt)
+        result, raw, latency_ms = await provider.complete_with_raw(prompt)
+        if collector is not None:
+            collector.add_call(LLMCallRecord(
+                stage="feedback_generation",
+                model_id=provider.model_id,
+                prompt_hash=prompt_hash,
+                prompt_text=prompt,
+                raw_response=raw,
+                latency_ms=latency_ms,
+            ))
     except Exception:
         logger.warning("Feedback generation failed", exc_info=True)
+        if collector is not None:
+            collector.add_call(LLMCallRecord(
+                stage="feedback_generation",
+                model_id=getattr(provider, "model_id", "unknown"),
+                prompt_hash=prompt_hash,
+                prompt_text=prompt,
+                raw_response="",
+                latency_ms=0,
+                success=False,
+                error="Feedback generation failed",
+            ))
         return FeedbackReport(summary="Unable to generate detailed feedback.")
 
     return FeedbackReport(

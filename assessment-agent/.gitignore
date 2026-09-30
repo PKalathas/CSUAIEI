@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.venv/
+venv/
+
+# Runtime data files (generated at runtime, not source)
+assessment_results.json
+review_queue.json
+anomaly_reports.json
+*.lock
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/

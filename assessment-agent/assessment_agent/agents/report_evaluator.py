@@ -1,9 +1,9 @@
 import logging
 
-from assessment_agent.models import ReportEvaluation, ReportCriterion
+from assessment_agent.models import ReportEvaluation, ReportCriterion, LLMCallRecord, ProvenanceCollector
 from assessment_agent.llm import LLMProvider
 from assessment_agent.rubric import AssignmentRubric
-from assessment_agent.prompt_loader import load_prompt
+from assessment_agent.prompt_loader import load_prompt_with_hash
 from assessment_agent import config
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,7 @@ async def evaluate_report(
     assignment_id: str,
     rubric: AssignmentRubric | None = None,
     provider: LLMProvider | None = None,
+    collector: ProvenanceCollector | None = None,
 ) -> ReportEvaluation:
     """Use an LLM to evaluate a student report against a rubric."""
     # Fall back to defaults for backward compatibility
@@ -43,7 +44,7 @@ async def evaluate_report(
         from assessment_agent.llm import get_llm_provider
         provider = get_llm_provider()
 
-    prompt = load_prompt(
+    prompt, prompt_hash = load_prompt_with_hash(
         "report_evaluation",
         assignment_id=assignment_id,
         course_id=config.COURSE_ID,
@@ -54,9 +55,29 @@ async def evaluate_report(
     )
 
     try:
-        result = await provider.complete_json(prompt)
+        result, raw, latency_ms = await provider.complete_with_raw(prompt)
+        if collector is not None:
+            collector.add_call(LLMCallRecord(
+                stage="report_evaluation",
+                model_id=provider.model_id,
+                prompt_hash=prompt_hash,
+                prompt_text=prompt,
+                raw_response=raw,
+                latency_ms=latency_ms,
+            ))
     except Exception:
         logger.warning("Report evaluation failed", exc_info=True)
+        if collector is not None:
+            collector.add_call(LLMCallRecord(
+                stage="report_evaluation",
+                model_id=getattr(provider, "model_id", "unknown"),
+                prompt_hash=prompt_hash,
+                prompt_text=prompt,
+                raw_response="",
+                latency_ms=0,
+                success=False,
+                error="Report evaluation failed",
+            ))
         return ReportEvaluation(
             llm_reasoning="Failed to parse LLM response for report evaluation."
         )

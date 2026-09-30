@@ -7,6 +7,7 @@ Requires the ``anthropic`` Python package and a valid API key
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 from .base import LLMProvider, extract_json
@@ -28,6 +29,10 @@ class AnthropicAPIProvider:
             )
         self.model = model
         self._client: Any = None  # lazily initialised
+
+    @property
+    def model_id(self) -> str:
+        return self.model
 
     # -- internal --------------------------------------------------------
 
@@ -61,7 +66,14 @@ class AnthropicAPIProvider:
         message = await client.messages.create(**kwargs)
         return message.content[0].text
 
+    async def complete_with_raw(self, prompt: str, system: str = "") -> tuple[dict, str, int]:
+        """Send *prompt* via the Anthropic API, return (parsed_json, raw_response, latency_ms)."""
+        start = time.monotonic()
+        raw = await self.complete(prompt, system)
+        latency_ms = int((time.monotonic() - start) * 1000)
+        return extract_json(raw), raw, latency_ms
+
     async def complete_json(self, prompt: str, system: str = "") -> dict:
         """Send *prompt* via the Anthropic API, parse the response as JSON."""
-        response = await self.complete(prompt, system)
-        return extract_json(response)
+        parsed, _, _ = await self.complete_with_raw(prompt, system)
+        return parsed

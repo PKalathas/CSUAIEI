@@ -10,8 +10,19 @@ from typing import Protocol
 class LLMProvider(Protocol):
     """Provider-agnostic interface for LLM inference."""
 
+    model_id: str
+
     async def complete(self, prompt: str, system: str = "") -> str:
         """Send a prompt and return the raw text response."""
+        ...
+
+    async def complete_with_raw(self, prompt: str, system: str = "") -> tuple[dict, str, int]:
+        """Send a prompt and return (parsed_json, raw_response_text, latency_ms).
+
+        Raw response is captured before extract_json strips it — use this for
+        provenance. latency_ms is wall-clock time of the complete() call.
+        complete_json() delegates to this.
+        """
         ...
 
     async def complete_json(self, prompt: str, system: str = "") -> dict:

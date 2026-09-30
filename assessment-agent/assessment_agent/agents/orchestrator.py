@@ -1,11 +1,14 @@
+import hashlib
+import logging
+
 from assessment_agent.models import (
     AssessmentResult,
     AssessmentRequest,
     SubmissionType,
     ManualReviewRequest,
+    LLMCallRecord,
+    ProvenanceCollector,
 )
-import logging
-
 from assessment_agent.agents.code_grader import grade_code
 from assessment_agent.agents.report_evaluator import evaluate_report
 from assessment_agent.agents.anomaly_detector import detect_anomalies
@@ -13,8 +16,8 @@ from assessment_agent.agents.feedback_generator import generate_feedback
 from assessment_agent.interfaces.integrity_guardian import report_anomaly
 from assessment_agent.interfaces.instructor_copilot import queue_for_review
 from assessment_agent.llm import get_llm_provider, LLMProvider
-from assessment_agent.rubric import load_rubric, AssignmentRubric
-from assessment_agent.prompt_loader import load_prompt
+from assessment_agent.rubric import load_rubric_with_hash, AssignmentRubric
+from assessment_agent.prompt_loader import load_prompt_with_hash
 from assessment_agent import config
 
 logger = logging.getLogger(__name__)
@@ -29,8 +32,17 @@ async def assess_submission(request: AssessmentRequest) -> AssessmentResult:
     a fixed pipeline.
     """
     # Load rubric and LLM provider for this assignment
-    rubric = load_rubric(request.assignment_id)
+    rubric, rubric_hash = load_rubric_with_hash(request.assignment_id)
     provider = get_llm_provider()
+
+    code_hash = hashlib.sha256(request.code.encode("utf-8")).hexdigest() if request.code else None
+    report_hash = hashlib.sha256(request.report.encode("utf-8")).hexdigest() if request.report else None
+    collector = ProvenanceCollector(
+        model_id=provider.model_id,
+        rubric_hash=rubric_hash,
+        code_hash=code_hash,
+        report_hash=report_hash,
+    )
 
     # Determine submission type
     if request.submission_type:
@@ -59,7 +71,7 @@ async def assess_submission(request: AssessmentRequest) -> AssessmentResult:
     if request.report and sub_type in (SubmissionType.REPORT_ONLY, SubmissionType.FULL):
         report_eval = await evaluate_report(
             request.report, request.assignment_id,
-            rubric=rubric, provider=provider,
+            rubric=rubric, provider=provider, collector=collector,
         )
         result.report_evaluation = report_eval
 
@@ -68,7 +80,7 @@ async def assess_submission(request: AssessmentRequest) -> AssessmentResult:
     if request.code:
         anomaly = await detect_anomalies(
             request.code, student_id=request.student_id,
-            rubric=rubric, provider=provider,
+            rubric=rubric, provider=provider, collector=collector,
         )
         result.anomaly_report = anomaly
 
@@ -85,7 +97,7 @@ async def assess_submission(request: AssessmentRequest) -> AssessmentResult:
     report_summary = f"{report_eval.raw_score}/100" if report_eval else "N/A"
     anomaly_summary = f"Risk: {anomaly.overall_risk}, {len(anomaly.flags)} flags" if anomaly else "N/A"
 
-    reasoning_prompt = load_prompt(
+    reasoning_prompt, reasoning_prompt_hash = load_prompt_with_hash(
         "orchestrator_reasoning",
         assignment_id=request.assignment_id,
         course_id=config.COURSE_ID,
@@ -98,7 +110,15 @@ async def assess_submission(request: AssessmentRequest) -> AssessmentResult:
     )
 
     try:
-        reasoning = await provider.complete_json(reasoning_prompt)
+        reasoning, raw_reasoning_response, reasoning_latency_ms = await provider.complete_with_raw(reasoning_prompt)
+        collector.add_call(LLMCallRecord(
+            stage="orchestrator_reasoning",
+            model_id=provider.model_id,
+            prompt_hash=reasoning_prompt_hash,
+            prompt_text=reasoning_prompt,
+            raw_response=raw_reasoning_response,
+            latency_ms=reasoning_latency_ms,
+        ))
     except Exception:
         logger.warning("Orchestrator reasoning failed, using defaults", exc_info=True)
         reasoning = {
@@ -123,6 +143,7 @@ async def assess_submission(request: AssessmentRequest) -> AssessmentResult:
         anomaly=anomaly,
         rubric=rubric,
         provider=provider,
+        collector=collector,
     )
     result.feedback = feedback
 
@@ -154,5 +175,7 @@ async def assess_submission(request: AssessmentRequest) -> AssessmentResult:
             assignment_id=request.assignment_id,
             anomaly_report=anomaly,
         )
+
+    result.provenance = collector.build()
 
     return result
